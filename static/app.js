@@ -1,5 +1,38 @@
 const fmt = (v) => (Number.isInteger(v) ? String(v) : String(Math.round(v * 10) / 10));
 
+function paintStars(el, value) {
+  el.querySelectorAll(".star-btn").forEach((btn) => {
+    const star = Number(btn.dataset.star);
+    const filled = value >= star;
+    const half = !filled && value >= star - 0.5;
+    btn.classList.toggle("fill", filled);
+    btn.classList.toggle("half", half);
+    btn.classList.toggle("empty", !(filled || half));
+  });
+}
+
+function starsValue(btn) {
+  const stars = btn.closest("[data-stars]");
+  const star = Number(btn.dataset.star);
+  const rect = btn.getBoundingClientRect();
+  const half = (eventX(btn, rect) <= rect.width / 2);
+  const val = half ? star - 0.5 : star;
+  return Math.max(0, val);
+}
+
+function eventX(btn, rect) {
+  if (btn._lastX !== undefined) return btn._lastX;
+  return 0;
+}
+
+function valueToStars(v) {
+  return Math.max(0, Math.min(5, v / 2));
+}
+
+function starsToValue(s) {
+  return Math.round(Math.max(0, Math.min(5, s)) * 2);
+}
+
 function paint(day) {
   document.querySelectorAll("[data-task-id]").forEach((el) => {
     const id = el.dataset.taskId;
@@ -10,8 +43,10 @@ function paint(day) {
       out.textContent = fmt(value);
       out.classList.toggle("done", value > 0);
     }
-    const input = el.querySelector('[data-role="input"]');
-    if (input && document.activeElement !== input) input.value = value;
+    const hidden = el.querySelector('[data-role="hidden-value"]');
+    if (hidden) hidden.value = value;
+    const stars = el.querySelector("[data-stars]");
+    if (stars) paintStars(stars, valueToStars(value));
   });
 
   const s = day.summary;
@@ -56,24 +91,27 @@ async function sendValue(form, value) {
 }
 
 document.addEventListener("click", (event) => {
-  const btn = event.target.closest(".quick .q");
+  const btn = event.target.closest(".star-btn");
   if (!btn) return;
   event.preventDefault();
-  sendValue(btn.closest("form"), Number(btn.value));
+  const form = btn.closest("[data-form]");
+  if (!form) return;
+  const val = starsToValue(starsValue(btn));
+  sendValue(form, val);
 });
 
-document.addEventListener("change", (event) => {
-  const input = event.target.closest('[data-role="input"]');
-  if (!input) return;
-  sendValue(input.closest("form"), Number(input.value));
+document.addEventListener("mousedown", (event) => {
+  const btn = event.target.closest(".star-btn");
+  if (!btn) return;
+  btn._lastX = event.clientX - btn.getBoundingClientRect().left;
 });
 
-document.addEventListener("keydown", (event) => {
-  const input = event.target.closest('[data-role="input"]');
-  if (!input || event.key !== "Enter") return;
-  event.preventDefault();
-  sendValue(input.closest("form"), Number(input.value));
-});
+document.addEventListener("touchstart", (event) => {
+  const btn = event.target.closest(".star-btn");
+  if (!btn) return;
+  const t = event.changedTouches[0];
+  btn._lastX = t.clientX - btn.getBoundingClientRect().left;
+}, { passive: true });
 
 let noteTimer = null;
 document.addEventListener("input", (event) => {

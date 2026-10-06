@@ -8,12 +8,11 @@
 </div>
 {% endmacro %}
 
-{% macro quick_buttons() %}
-<div class="quick">
-  {% for v in [1, 3, 5, 7, 10] %}
-  <button type="submit" name="quick" value="{{ v }}" class="q" title="Marcar {{ v }}">{{ v }}</button>
+{% macro star_rating(task, day_str) %}
+<div class="stars" data-stars data-value="{{ task.value }}" role="radiogroup" aria-label="Puntuacion">
+  {% for i in range(1, 6) %}
+  <button type="button" class="star-btn" data-star="{{ i }}" aria-label="Dar {{ i }} estrellas">{{ '★' }}</button>
   {% endfor %}
-  <button type="submit" name="quick" value="0" class="q zero" title="No se hizo">0</button>
 </div>
 {% endmacro %}
 
@@ -70,13 +69,12 @@
     </div>
 
     {% if not task.auto %}
-    <form class="entry-form" method="post" action="/entrada">
+    <form class="entry-form" method="post" action="/entrada" data-form>
       <input type="hidden" name="task_id" value="{{ task.id }}">
       <input type="hidden" name="day" value="{{ day_str }}">
+      <input type="hidden" name="value" value="{{ task.value|int }}" data-role="hidden-value">
       <div class="controls">
-        {{ quick_buttons() }}
-        <input type="number" name="value" min="0" max="10" value="{{ task.value|int }}" class="num" data-role="input">
-        <button type="submit" class="save">Guardar</button>
+        {{ star_rating(task, day_str) }}
       </div>
       <details class="note">
         <summary>nota del dia</summary>
@@ -95,12 +93,12 @@
           {% if child.area %}<span class="tag area">{{ child.area }}</span>{% endif %}
           {% if child.agenda %}<span class="tag agenda">solo hoy</span>{% endif %}
         </div>
-        <form class="entry-form inline" method="post" action="/entrada">
+        <form class="entry-form inline" method="post" action="/entrada" data-form>
           <input type="hidden" name="task_id" value="{{ child.id }}">
           <input type="hidden" name="day" value="{{ day_str }}">
+          <input type="hidden" name="value" value="{{ child.value|int }}" data-role="hidden-value">
           <div class="controls">
-            {{ quick_buttons() }}
-            <input type="number" name="value" min="0" max="10" value="{{ child.value|int }}" class="num" data-role="input">
+            {{ star_rating(child, day_str) }}
           </div>
         </form>
       </li>
