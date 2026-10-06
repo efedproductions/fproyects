@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}Tareas &middot; Diario{% endblock %}
+
+{% macro acciones(task) %}
+<form method="post" action="/tareas/{{ task.id }}/{{ 'restaurar' if task.archived_on else 'archivar' }}" class="inline">
+  <input type="hidden" name="day" value="{{ today }}">
+  <button type="submit">{{ 'Recuperar' if task.archived_on else 'Borrar desde hoy' }}</button>
+</form>
+<form method="post" action="/tareas/{{ task.id }}/borrar" class="inline"
+      onsubmit="return confirm('Borrar «{{ task.name }}» y todo su historial para siempre?')">
+  <button type="submit" class="danger">Borrar para siempre</button>
+</form>
+{% endmacro %}
+
+{% block content %}
+<h1>Tareas</h1>
+<p class="hint">Una tarea aparece cada dia desde su fecha de inicio con un 0. Si la borras, deja de aparecer; el historial anterior se conserva.</p>
+
+<section class="card">
+  <h2>Nueva tarea</h2>
+  <form method="post" action="/tareas/crear" class="grid">
+    <input type="text" name="name" placeholder="Nombre (ej. Limpieza en casa)" required>
+    <input type="text" name="area" list="areas" placeholder="Area (aprender, ocio, salud...)">
+    <input type="date" name="start_date" value="{{ today }}">
+    <input type="text" name="note" placeholder="Nota opcional">
+    <select name="parent_id">
+      <option value="">Sin tarea padre</option>
+      {% for root in roots %}
+        {% if not root.archived_on %}
+        <option value="{{ root.id }}">Hija de: {{ root.name }}</option>
+        {% endif %}
+      {% endfor %}
+    </select>
+    <button type="submit">Crear tarea</button>
+  </form>
+  <datalist id="areas">
+    {% for area in areas %}<option value="{{ area }}">{% endfor %}
+  </datalist>
+</section>
+
+<section>
+  <h2>Activas</h2>
+  {% for root in roots %}
+    {% if root.archived_on is none or root.archived_on > today %}
+    <article class="task manage">
+      <div class="row">
+        <div class="labels">
+          <span class="name">{{ root.name }}</span>
+          {% if root.area %}<span class="tag area">{{ root.area }}</span>{% endif %}
+          <span class="hint">desde {{ root.start_date }}{% if root.archived_on %} &middot; se borra el {{ root.archived_on }}{% endif %}</span>
+          {% if root.note %}<span class="hint">{{ root.note }}</span>{% endif %}
+        </div>
+        {{ acciones(root) }}
+      </div>
+
+      <form method="post" action="/tareas/{{ root.id }}/editar" class="grid edit">
+        <input type="text" name="name" value="{{ root.name }}" required>
+        <input type="text" name="area" list="areas" value="{{ root.area or '' }}">
+        <input type="text" name="note" value="{{ root.note or '' }}" placeholder="Nota">
+        <button type="submit">Guardar cambios</button>
+      </form>
+
+      <details class="split">
+        <summary>Dividir en subtareas ({{ root.active_children or 0 }})</summary>
+        <form method="post" action="/tareas/crear" class="grid">
+          <input type="hidden" name="parent_id" value="{{ root.id }}">
+          <input type="hidden" name="start_date" value="{{ today }}">
+          <input type="text" name="name" placeholder="Subtarea (ej. Bano, Cocina, Ejercicio de brazos)" required>
+          <input type="text" name="area" list="areas" placeholder="Area" value="{{ root.area or '' }}">
+          <button type="submit">Anadir subtarea</button>
+        </form>
+        {% if root.active_children %}
+        <form method="post" action="/tareas/{{ root.id }}/quitar-hijas" class="inline">
+          <input type="hidden" name="from_date" value="{{ today }}">
+          <button type="submit">Retirar las subtareas desde hoy (la tarea vuelve a puntuarse sola)</button>
+        </form>
+        {% endif %}
+      </details>
+
+      {% if root.children %}
+      <ul class="children manage-children">
+        {% for child in root.children %}
+        <li>
+          <div class="row">
+            <div class="labels">
+              <span class="name">{{ child.name }}</span>
+              {% if child.area %}<span class="tag area">{{ child.area }}</span>{% endif %}
+              <span class="hint">desde {{ child.start_date }}{% if child.archived_on %} &middot; se borra el {{ child.archived_on }}{% endif %}</span>
+            </div>
+            {{ acciones(child) }}
+          </div>
+          <form method="post" action="/tareas/{{ child.id }}/editar" class="grid edit">
+            <input type="hidden" name="note" value="">
+            <input type="text" name="name" value="{{ child.name }}" required>
+            <input type="text" name="area" list="areas" value="{{ child.area or '' }}">
+            <button type="submit">Guardar</button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </article>
+    {% endif %}
+  {% else %}
+    <p class="empty">Todavia no hay tareas.</p>
+  {% endfor %}
+</section>
+
+{% if archived %}
+<section>
+  <h2>Archivadas</h2>
+  <p class="hint">Ya no aparecen en el dia, pero su historial sigue en las estadisticas.</p>
+  {% for task in archived %}
+  <article class="task manage archived">
+    <div class="row">
+      <div class="labels">
+        <span class="name">{{ task.name }}</span>
+        {% if task.area %}<span class="tag area">{{ task.area }}</span>{% endif %}
+        <span class="hint">se borro el {{ task.archived_on }}</span>
+      </div>
+      {{ acciones(task) }}
+    </div>
+  </article>
+  {% endfor %}
+</section>
+{% endif %}
+{% endblock %}

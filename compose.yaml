@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    image: diario:local
+    container_name: diario
+    restart: unless-stopped
+    environment:
+      DIARIO_DB: /data/diario.db
+      DIARIO_USER: ${DIARIO_USER:-admin}
+      DIARIO_PASSWORD: ${DIARIO_PASSWORD:-}
+      DIARIO_SECURE_COOKIE: ${DIARIO_SECURE_COOKIE:-0}
+    volumes:
+      - ./data:/data
+    ports:
+      - "${DIARIO_BIND:-127.0.0.1}:${DIARIO_PORT:-8300}:8000"

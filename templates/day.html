@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% macro value_control(task, day_str) %}
+<div class="value-box">
+  <span class="value{{ ' done' if task.done else '' }}" data-role="value">{{ task.value|num }}</span>
+  {% if task.auto %}
+    <span class="tag">calculado</span>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro quick_buttons() %}
+<div class="quick">
+  {% for v in [1, 3, 5, 7, 10] %}
+  <button type="submit" name="quick" value="{{ v }}" class="q" title="Marcar {{ v }}">{{ v }}</button>
+  {% endfor %}
+  <button type="submit" name="quick" value="0" class="q zero" title="No se hizo">0</button>
+</div>
+{% endmacro %}
+
+{% block content %}
+<section class="daybar">
+  <a class="nav" href="/?day={{ prev_day }}">&larr; anterior</a>
+  <div class="center">
+    <strong>{{ day_name }} {{ day_str }}</strong>
+    {% if is_today %}<span class="tag">hoy</span>{% endif %}
+  </div>
+  {% if is_today %}
+    <span></span>
+  {% else %}
+    <a class="nav" href="/?day={{ next_day }}">siguiente &rarr;</a>
+  {% endif %}
+</section>
+
+<form class="datepick" method="get" action="/">
+  <input type="date" name="day" value="{{ day_str }}" data-role="datepick">
+  <button type="submit">Ir</button>
+</form>
+
+<section class="summary">
+  <div class="card">
+    <span class="label">Media del dia</span>
+    <strong data-role="summary-avg">{{ summary.avg|num }}</strong>
+    <span class="hint">solo de lo hecho</span>
+  </div>
+  <div class="card">
+    <span class="label">Tareas hechas</span>
+    <strong><span data-role="summary-done">{{ summary.done }}</span>/<span data-role="summary-total">{{ summary.total }}</span></strong>
+    <span class="hint">{{ '%.0f'|format((summary.completion or 0) * 100) }}%</span>
+  </div>
+  <div class="card">
+    <span class="label">Subtareas</span>
+    <strong><span data-role="summary-leaf-done">{{ summary.leaf_done }}</span>/<span data-role="summary-leaf-total">{{ summary.leaf_total }}</span></strong>
+    <span class="hint">{{ '%.0f'|format((summary.leaf_completion or 0) * 100) }}%</span>
+  </div>
+</section>
+
+<section class="tasks">
+{% for task in items %}
+  <article class="task" data-task-id="{{ task.id }}">
+    <div class="row">
+      {{ value_control(task, day_str) }}
+      <div class="labels">
+        <span class="name">{{ task.name }}</span>
+        {% if task.area %}<span class="tag area">{{ task.area }}</span>{% endif %}
+        {% if task.auto %}
+          <span class="hint">{{ task.done_children }}/{{ task.children|length }} hechas &middot; {{ '%.0f'|format((task.completion or 0) * 100) }}% &middot; media de las hechas</span>
+        {% endif %}
+        {% if task.note %}<span class="hint">{{ task.note }}</span>{% endif %}
+      </div>
+    </div>
+
+    {% if not task.auto %}
+    <form class="entry-form" method="post" action="/entrada">
+      <input type="hidden" name="task_id" value="{{ task.id }}">
+      <input type="hidden" name="day" value="{{ day_str }}">
+      <div class="controls">
+        {{ quick_buttons() }}
+        <input type="number" name="value" min="0" max="10" value="{{ task.value|int }}" class="num" data-role="input">
+        <button type="submit" class="save">Guardar</button>
+      </div>
+      <details class="note">
+        <summary>nota del dia</summary>
+        <input type="text" name="note" value="{{ task.day_note }}" placeholder="detalle opcional">
+      </details>
+    </form>
+    {% endif %}
+
+    {% if task.children %}
+    <ul class="children">
+      {% for child in task.children %}
+      <li data-task-id="{{ child.id }}">
+        {{ value_control(child, day_str) }}
+        <div class="labels">
+          <span class="name">{{ child.name }}</span>
+          {% if child.area %}<span class="tag area">{{ child.area }}</span>{% endif %}
+        </div>
+        <form class="entry-form inline" method="post" action="/entrada">
+          <input type="hidden" name="task_id" value="{{ child.id }}">
+          <input type="hidden" name="day" value="{{ day_str }}">
+          <div class="controls">
+            {{ quick_buttons() }}
+            <input type="number" name="value" min="0" max="10" value="{{ child.value|int }}" class="num" data-role="input">
+          </div>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </article>
+{% else %}
+  <p class="empty">No hay tareas para este dia. <a href="/tareas">Crea la primera</a>.</p>
+{% endfor %}
+</section>
+
+<section class="newnote">
+  <h2>Nota del dia</h2>
+  <form method="post" action="/nota-dia">
+    <input type="hidden" name="day" value="{{ day_str }}">
+    <textarea name="content" rows="4" data-role="day-note" placeholder="Como ha ido el dia...">{{ note }}</textarea>
+    <button type="submit">Guardar nota</button>
+    <span class="hint" data-role="saved"></span>
+  </form>
+</section>
+{% endblock %}

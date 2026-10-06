@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Estadisticas &middot; Diario{% endblock %}
+
+{% set n = rows|length %}
+{% set bar = (100 / n) if n else 1 %}
+
+{% block content %}
+<h1>Estadisticas</h1>
+
+<nav class="ranges">
+  {% for d in [7, 30, 90, 365] %}
+    <a class="range{{ ' on' if d == days else '' }}" href="/estadisticas?days={{ d }}">{{ d }} dias</a>
+  {% endfor %}
+</nav>
+
+<section class="summary">
+  <div class="card">
+    <span class="label">Media (solo lo hecho)</span>
+    <strong>{{ avg|num }}</strong>
+    <span class="hint">ultimos {{ days }} dias</span>
+  </div>
+  <div class="card">
+    <span class="label">Ratio completado</span>
+    <strong>{{ '%.0f'|format((completion or 0) * 100) }}%</strong>
+    <span class="hint">tareas con valor &gt; 0</span>
+  </div>
+  <div class="card">
+    <span class="label">Dias con actividad</span>
+    <strong>{{ active_days }}</strong>
+    <span class="hint">de {{ days }}</span>
+  </div>
+  <div class="card">
+    <span class="label">Racha actual</span>
+    <strong>{{ streak }}</strong>
+    <span class="hint">dias seguidos</span>
+  </div>
+  <div class="card">
+    <span class="label">Mejor dia</span>
+    <strong class="small">{{ best_label }}</strong>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Media por dia (solo dias con actividad)</h2>
+  <svg class="chart" viewBox="0 0 100 26" preserveAspectRatio="none">
+    {% for row in rows %}
+      {% if row.avg %}
+      <rect x="{{ loop.index0 * bar }}" y="{{ 24 - (row.avg / 10) * 22 }}" width="{{ bar * 0.75 }}" height="{{ (row.avg / 10) * 22 + 0.2 }}" class="bar"></rect>
+      {% endif %}
+    {% endfor %}
+  </svg>
+  <div class="axis"><span>{{ rows[0].day }}</span><span>{{ rows[-1].day }}</span></div>
+</section>
+
+<section class="card">
+  <h2>Por area</h2>
+  <table>
+    <tr><th>Area</th><th>Media</th><th>Dias hechos</th><th>Dias</th></tr>
+    {% for a in areas %}
+    <tr>
+      <td>{{ a.area }}</td>
+      <td>{{ a.avg|num }}</td>
+      <td>{{ a.done }}</td>
+      <td>{{ a.days }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</section>
+
+<section class="card">
+  <h2>Detalle diario</h2>
+  <table>
+    <tr><th>Dia</th><th>Media</th><th>Hechas</th><th>Tareas</th><th>Subtareas</th></tr>
+    {% for row in rows %}
+    <tr>
+      <td><a href="/?day={{ row.day }}">{{ row.day }}</a></td>
+      <td>{{ row.avg|num }}</td>
+      <td>{{ row.done }}/{{ row.total }}</td>
+      <td>{{ '%.0f'|format((row.completion or 0) * 100) }}%</td>
+      <td>{{ row.leaf_done }}/{{ row.leaf_total }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</section>
+{% endblock %}

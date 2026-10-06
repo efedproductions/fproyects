@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Entrar &middot; Diario de acciones</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="centered">
+<main class="login">
+  <h1>Diario de acciones</h1>
+  <p class="hint">Este despliegue es privado.</p>
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+  <form method="post" action="/login" class="grid">
+    <input type="hidden" name="next" value="{{ next }}">
+    <input type="text" name="username" placeholder="Usuario" autocomplete="username" autofocus required>
+    <input type="password" name="password" placeholder="Contraseña" autocomplete="current-password" required>
+    <button type="submit">Entrar</button>
+  </form>
+  <p class="hint">¿No recuerdas la contraseña? Reinicia el servidor: al arrancar muestra la
+  que generó en la consola, o ejecuta <code>python manage.py passwd</code>.</p>
+</main>
+</body>
+</html>

@@ -1,0 +1,19 @@
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: diario-caddy
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?configura DOMAIN con tu dominio, por ejemplo diario.tudominio.com}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+
+volumes:
+  caddy_data:
+  caddy_config:
