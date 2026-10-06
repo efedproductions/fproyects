@@ -15,7 +15,8 @@
 
 {% block content %}
 <h1>Tareas</h1>
-<p class="hint">Una tarea aparece cada dia desde su fecha de inicio con un 0. Si la borras, deja de aparecer; el historial anterior se conserva.</p>
+<p class="hint">Una tarea aparece cada dia desde su fecha de inicio con un 0. Si la borras, deja de aparecer; el historial anterior se conserva.
+  Tambien puedes <a href="/tareas/base">anadir tareas base</a>.</p>
 
 <section class="card">
   <h2>Nueva tarea</h2>
@@ -24,6 +25,7 @@
     <input type="text" name="area" list="areas" placeholder="Area (aprender, ocio, salud...)">
     <input type="date" name="start_date" value="{{ today }}">
     <input type="text" name="note" placeholder="Nota opcional">
+    <label class="check"><input type="checkbox" name="repeat" value="0"> Solo un dia (agenda)</label>
     <select name="parent_id">
       <option value="">Sin tarea padre</option>
       {% for root in roots %}
@@ -48,6 +50,7 @@
         <div class="labels">
           <span class="name">{{ root.name }}</span>
           {% if root.area %}<span class="tag area">{{ root.area }}</span>{% endif %}
+          {% if not root.repeat %}<span class="tag agenda">un solo dia &middot; {{ root.start_date }}</span>{% endif %}
           <span class="hint">desde {{ root.start_date }}{% if root.archived_on %} &middot; se borra el {{ root.archived_on }}{% endif %}</span>
           {% if root.note %}<span class="hint">{{ root.note }}</span>{% endif %}
         </div>
@@ -68,6 +71,7 @@
           <input type="hidden" name="start_date" value="{{ today }}">
           <input type="text" name="name" placeholder="Subtarea (ej. Bano, Cocina, Ejercicio de brazos)" required>
           <input type="text" name="area" list="areas" placeholder="Area" value="{{ root.area or '' }}">
+          <label class="check"><input type="checkbox" name="repeat" value="0"> Solo un dia (agenda)</label>
           <button type="submit">Anadir subtarea</button>
         </form>
         {% if root.active_children %}
@@ -86,6 +90,7 @@
             <div class="labels">
               <span class="name">{{ child.name }}</span>
               {% if child.area %}<span class="tag area">{{ child.area }}</span>{% endif %}
+              {% if not child.repeat %}<span class="tag agenda">un solo dia &middot; {{ child.start_date }}</span>{% endif %}
               <span class="hint">desde {{ child.start_date }}{% if child.archived_on %} &middot; se borra el {{ child.archived_on }}{% endif %}</span>
             </div>
             {{ acciones(child) }}
@@ -106,6 +111,28 @@
     <p class="empty">Todavia no hay tareas.</p>
   {% endfor %}
 </section>
+
+{% if past_agenda %}
+<section class="past-agenda">
+  <details>
+    <summary>Agenda pasada ({{ past_agenda|length }})</summary>
+    <p class="hint">Anotaciones de dias anteriores. Ya no aparecen en ningun dia, pero aqui
+      puedes borrarlas.</p>
+    {% for task in past_agenda %}
+    <article class="task manage archived">
+      <div class="row">
+        <div class="labels">
+          <span class="name">{{ task.name }}</span>
+          {% if task.area %}<span class="tag area">{{ task.area }}</span>{% endif %}
+          <span class="hint">{{ task.start_date }}</span>
+        </div>
+        {{ acciones(task) }}
+      </div>
+    </article>
+    {% endfor %}
+  </details>
+</section>
+{% endif %}
 
 {% if archived %}
 <section>

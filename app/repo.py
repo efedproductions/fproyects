@@ -7,7 +7,7 @@ from datetime import date, timedelta
 from .db import clamp_value, iso, now, parse_day
 from .rules import completion, done_count, mean_positive, rollup
 
-TASK_COLUMNS = "id, name, area, note, parent_id, start_date, archived_on, position"
+TASK_COLUMNS = "id, name, area, note, parent_id, start_date, archived_on, repeat, position"
 
 
 def row_to_task(row: sqlite3.Row) -> dict:
@@ -49,11 +49,16 @@ def areas(conn: sqlite3.Connection) -> list[str]:
 
 
 def visible_tasks(tasks: list[dict], day: str) -> list[dict]:
-    return [
-        t
-        for t in tasks
-        if t["start_date"] <= day and (t["archived_on"] is None or t["archived_on"] > day)
-    ]
+    visible = []
+    for task in tasks:
+        if task["start_date"] > day:
+            continue
+        if not task.get("repeat", 1) and task["start_date"] != day:
+            continue
+        if task["archived_on"] is not None and task["archived_on"] <= day:
+            continue
+        visible.append(task)
+    return visible
 
 
 def entries_for(conn: sqlite3.Connection, day: str) -> dict[int, tuple[int, str]]:
@@ -79,52 +84,70 @@ def entry_parts(raw) -> tuple[int, str]:
     return raw, ""
 
 
+def _drop_leaves(item: dict) -> None:
+    item.pop("_leaves", None)
+    for child in item["children"]:
+        _drop_leaves(child)
+
+
 def compute_day(tasks: list[dict], entries: dict[int, tuple[int, str] | int]) -> dict:
     kids: dict[int, list[dict]] = defaultdict(list)
     for task in tasks:
         if task["parent_id"]:
             kids[task["parent_id"]].append(task)
 
-    def value_of(task: dict) -> float:
-        children = kids.get(task["id"], [])
-        if children:
-            return rollup([value_of(c) for c in children])
-        return float(entry_parts(entries.get(task["id"]))[0])
-
-    roots = [t for t in tasks if not t["parent_id"]]
-
     def build(task: dict) -> dict:
         children = kids.get(task["id"], [])
-        value = value_of(task)
         child_items = [build(c) for c in children]
+        routine = [c for c in child_items if not c["agenda"]]
+        agenda = not task.get("repeat", 1)
+        auto = bool(routine)
+        own = float(entry_parts(entries.get(task["id"]))[0])
+        value = rollup([c["value"] for c in routine]) if auto else own
         _, day_note = entry_parts(entries.get(task["id"]))
-        item = {
+
+        if auto:
+            leaves = [leaf for child in routine for leaf in child["_leaves"]]
+        elif agenda and not children:
+            leaves = []
+        else:
+            leaves = [own]
+
+        return {
             **task,
             "value": value,
             "done": value > 0,
-            "auto": bool(children),
+            "auto": auto,
+            "agenda": agenda,
             "day_note": day_note,
             "children": child_items,
-            "completion": completion([c["value"] for c in child_items]) if child_items else None,
-            "done_children": done_count([c["value"] for c in child_items]),
+            "children_total": len(routine),
+            "completion": completion([c["value"] for c in routine]) if routine else None,
+            "done_children": done_count([c["value"] for c in routine]),
+            "_leaves": leaves,
         }
-        return item
 
-    items = [build(t) for t in roots]
+    items = [build(t) for t in tasks if not t["parent_id"]]
 
-    top_values = [i["value"] for i in items]
-    leaf_values = [
-        c["value"] for item in items for c in (item["children"] or [item])
-    ]
+    top = [i["value"] for i in items if not i["agenda"]]
+    if not top:
+        top = [i["value"] for i in items]
+
+    leaves = [leaf for item in items for leaf in item["_leaves"]]
+    if not leaves:
+        leaves = [i["value"] for i in items if i["agenda"]]
+
+    for item in items:
+        _drop_leaves(item)
 
     summary = {
-        "avg": mean_positive(top_values),
-        "done": done_count(top_values),
-        "total": len(top_values),
-        "completion": completion(top_values),
-        "leaf_done": done_count(leaf_values),
-        "leaf_total": len(leaf_values),
-        "leaf_completion": completion(leaf_values),
+        "avg": mean_positive(top),
+        "done": done_count(top),
+        "total": len(top),
+        "completion": completion(top),
+        "leaf_done": done_count(leaves),
+        "leaf_total": len(leaves),
+        "leaf_completion": completion(leaves),
     }
     return {"items": items, "summary": summary}
 
@@ -178,6 +201,8 @@ def set_entry(
         raise ValueError("La tarea todavia no empieza ese dia")
     if task["archived_on"] is not None and task["archived_on"] <= day:
         raise ValueError("La tarea esta borrada ese dia")
+    if not task.get("repeat", 1) and day != task["start_date"]:
+        raise ValueError("Eso es una anotacion de agenda: solo existe en su dia")
     active_children = conn.execute(
         """
         SELECT 1 FROM task
@@ -231,6 +256,7 @@ def create_task(
     note: str | None = None,
     parent_id: int | None = None,
     start_day: date | str | None = None,
+    repeat: bool = True,
 ) -> int:
     clean_name = clean_text(name)
     if not clean_name:
@@ -247,11 +273,15 @@ def create_task(
         child_start = iso(parent["start_date"])
         if start < child_start:
             start = child_start
+        if parent.get("repeat", 1) == 0:
+            start = iso(parent["start_date"])
+            repeat = False
 
     cur = conn.execute(
         """
-        INSERT INTO task (name, area, note, parent_id, start_date, position, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO task (name, area, note, parent_id, start_date, repeat, position,
+                          created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             clean_name,
@@ -259,6 +289,7 @@ def create_task(
             clean_text(note),
             parent_id,
             start,
+            1 if repeat else 0,
             next_position(conn, parent_id),
             now(),
             now(),

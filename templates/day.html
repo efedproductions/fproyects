@@ -63,7 +63,7 @@
         <span class="name">{{ task.name }}</span>
         {% if task.area %}<span class="tag area">{{ task.area }}</span>{% endif %}
         {% if task.auto %}
-          <span class="hint">{{ task.done_children }}/{{ task.children|length }} hechas &middot; {{ '%.0f'|format((task.completion or 0) * 100) }}% &middot; media de las hechas</span>
+          <span class="hint">{{ task.done_children }}/{{ task.children_total }} hechas &middot; {{ '%.0f'|format((task.completion or 0) * 100) }}% &middot; media de las hechas</span>
         {% endif %}
         {% if task.note %}<span class="hint">{{ task.note }}</span>{% endif %}
       </div>
@@ -88,11 +88,12 @@
     {% if task.children %}
     <ul class="children">
       {% for child in task.children %}
-      <li data-task-id="{{ child.id }}">
+      <li data-task-id="{{ child.id }}" class="{{ 'agenda' if child.agenda else '' }}">
         {{ value_control(child, day_str) }}
         <div class="labels">
           <span class="name">{{ child.name }}</span>
           {% if child.area %}<span class="tag area">{{ child.area }}</span>{% endif %}
+          {% if child.agenda %}<span class="tag agenda">solo hoy</span>{% endif %}
         </div>
         <form class="entry-form inline" method="post" action="/entrada">
           <input type="hidden" name="task_id" value="{{ child.id }}">
@@ -106,9 +107,31 @@
       {% endfor %}
     </ul>
     {% endif %}
+
+    <details class="agenda">
+      <summary>Anadir anotacion de hoy</summary>
+      <form method="post" action="/tareas/crear" class="grid">
+        <input type="hidden" name="parent_id" value="{{ task.id }}">
+        <input type="hidden" name="start_date" value="{{ day_str }}">
+        <input type="hidden" name="repeat" value="0">
+        <input type="hidden" name="area" value="{{ task.area or '' }}">
+        <input type="hidden" name="return_to" value="/?day={{ day_str }}">
+        <input type="text" name="name" placeholder="Ej. Reunion 10:00, comprar pastillas..." required>
+        <button type="submit">Anadir solo para hoy</button>
+      </form>
+      <p class="hint">Existe unicamente este dia y no entra en la media.</p>
+    </details>
   </article>
 {% else %}
-  <p class="empty">No hay tareas para este dia. <a href="/tareas">Crea la primera</a>.</p>
+  <div class="card starter">
+    <h2>Todavia no hay tareas</h2>
+    <p class="hint">Empieza con una lista base que casi cualquier persona necesita, o crea la primera
+      a mano.</p>
+    <div class="actions">
+      <a class="nav primary" href="/tareas/base?day={{ day_str }}">Cargar tareas base</a>
+      <a class="nav" href="/tareas">Crear una a mano</a>
+    </div>
+  </div>
 {% endfor %}
 </section>
 

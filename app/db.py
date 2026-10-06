@@ -8,7 +8,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DEFAULT_DB_PATH = BASE_DIR / "data" / "diario.db"
 MAX_VALUE = 10
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS app_user (
@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS task (
     parent_id INTEGER REFERENCES task(id) ON DELETE CASCADE,
     start_date TEXT NOT NULL,
     archived_on TEXT,
+    repeat INTEGER NOT NULL DEFAULT 1,
     position INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
@@ -87,6 +88,16 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
 
 def init_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
+    migrate(conn)
+
+
+def migrate(conn: sqlite3.Connection) -> None:
+    version = conn.execute("PRAGMA user_version").fetchone()[0]
+    if version >= SCHEMA_VERSION:
+        return
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(task)").fetchall()}
+    if "repeat" not in columns:
+        conn.execute("ALTER TABLE task ADD COLUMN repeat INTEGER NOT NULL DEFAULT 1")
     conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
 

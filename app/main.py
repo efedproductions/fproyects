@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
-from . import auth, portability, repo
+from . import auth, portability, repo, starter
 from .db import MAX_VALUE, connect, db_path, iso, parse_day
 from .rules import day_label, format_number, streak_days
 
@@ -239,6 +239,7 @@ def day_context(conn, day: date) -> dict:
         "items": view["items"],
         "summary": view["summary"],
         "note": view["note"],
+        "no_tasks": not view["items"],
         "areas": repo.areas(conn),
         "error": None,
     }
@@ -329,6 +330,8 @@ def tasks_page(request: Request, error: str | None = None, conn=Depends(get_conn
         kids.setdefault(task["parent_id"], []).append(task)
     roots = kids.get(None, [])
     today = iso(date.today())
+    active: list[dict] = []
+    past_agenda: list[dict] = []
     for root in roots:
         children = kids.get(root["id"], [])
         root["children"] = children
@@ -337,11 +340,16 @@ def tasks_page(request: Request, error: str | None = None, conn=Depends(get_conn
         root["active_children"] = sum(
             1 for c in children if c["archived_on"] is None or c["archived_on"] > today
         )
+        if not root.get("repeat", 1) and root["start_date"] < today:
+            past_agenda.append(root)
+        else:
+            active.append(root)
     return templates.TemplateResponse(
         request,
         "tasks.html",
         {
-            "roots": roots,
+            "roots": active,
+            "past_agenda": sorted(past_agenda, key=lambda t: t["start_date"], reverse=True),
             "areas": repo.areas(conn),
             "today": today,
             "archived": [t for t in tasks if t["archived_on"] is not None and t["archived_on"] <= today],
@@ -358,15 +366,64 @@ def create_task_form(
     parent_id: str | None = Form(None),
     start_date: str | None = Form(None),
     day: str | None = Form(None),
+    repeat: str = Form("1"),
+    return_to: str | None = Form(None),
     conn=Depends(get_conn),
 ):
     parent = int(parent_id) if parent_id not in (None, "", "None") else None
     start = iso(safe_day(start_date)) if start_date else iso(safe_day(day))
+    one_shot = repeat in ("0", "false", "off")
     try:
-        repo.create_task(conn, name, area, note, parent, start)
+        repo.create_task(conn, name, area, note, parent, start, repeat=not one_shot)
     except ValueError as exc:
         return back("/tareas", error=str(exc))
-    return RedirectResponse(url="/tareas", status_code=303)
+    return RedirectResponse(url=_safe_return(return_to), status_code=303)
+
+
+def _safe_return(path: str | None) -> str:
+    if path and path.startswith("/") and not path.startswith("//") and "\\" not in path:
+        return path
+    return "/tareas"
+
+
+@app.get("/tareas/base", response_class=HTMLResponse)
+def base_tasks_page(
+    request: Request,
+    day: str | None = None,
+    creadas: int | None = None,
+    omitidas: int | None = None,
+    error: str | None = None,
+    conn=Depends(get_conn),
+):
+    return templates.TemplateResponse(
+        request,
+        "tareas_base.html",
+        {
+            "base_tasks": starter.BASE_TASKS,
+            "areas": repo.areas(conn),
+            "error": error,
+            "day": day,
+            "creadas": creadas,
+            "omitidas": omitidas,
+            "count": len(repo.all_tasks(conn)),
+        },
+    )
+
+
+@app.post("/tareas/base")
+async def base_tasks_create(
+    request: Request,
+    other: str = Form(""),
+    day: str | None = Form(None),
+    conn=Depends(get_conn),
+):
+    form = await request.form()
+    selected = [value for value in form.getlist("tasks") if value]
+    report = starter.load_base(conn, selected, other, day and safe_day(day))
+    if day:
+        return RedirectResponse(url=f"/?day={iso(safe_day(day))}", status_code=303)
+    params = f"creadas={len(report['created'])}&omitidas={len(report['skipped'])}"
+    return RedirectResponse(url=f"/tareas/base?{params}", status_code=303)
 
 
 @app.post("/tareas/{task_id}/editar")

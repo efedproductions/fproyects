@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Tareas base &middot; Diario{% endblock %}
+
+{% block content %}
+<h1>Tareas base</h1>
+
+{% if creadas is not none %}
+<div class="ok">
+  Creadas {{ creadas }} tarea{% if creadas != 1 %}s{% endif %}.
+  {% if omitidas %}{{ omitidas }} ya existian y se han dejado como estaban.{% endif %}
+  {% if day %}<a href="/?day={{ day }}">Ver el dia</a> ·{% endif %}
+  <a href="/tareas">Ver mis tareas</a>
+</div>
+{% elif count %}
+<p class="hint">Ya tienes {{ count }} tarea{{ 's' if count != 1 }}. Aqui solo se anaden las que marques:
+  no se borra nada de lo que ya tienes.</p>
+{% else %}
+<p class="hint">Son tareas que casi cualquier persona necesita. Desmarca las que no te sirvan y
+  anade las tuyas; siempre las podras editar o borrar luego.</p>
+{% endif %}
+
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+<form method="post" action="/tareas/base" class="picker">
+  {% if day %}<input type="hidden" name="day" value="{{ day }}">{% endif %}
+
+  <section class="cards">
+    {% for item in base_tasks %}
+    <label class="pick">
+      <input type="checkbox" name="tasks" value="{{ item.name }}"
+             {% if item.default %}checked{% endif %}>
+      <span class="labels">
+        <span class="name">{{ item.name }}</span>
+        <span class="tag area">{{ item.area }}</span>
+        <span class="hint">{{ item.hint }}</span>
+      </span>
+    </label>
+    {% endfor %}
+  </section>
+
+  <section class="card">
+    <h2>Otras tuyas</h2>
+    <textarea name="other" rows="3" placeholder="Una por linea. Opcional: Nombre | area"></textarea>
+    <p class="hint">Ejemplo: <code>Leer | ocio</code></p>
+  </section>
+
+  <div class="actions">
+    <button type="submit" class="primary">Cargar las marcadas</button>
+    <a class="nav" href="/tareas">Omitir, quiero empezar de cero</a>
+  </div>
+</form>
+{% endblock %}
