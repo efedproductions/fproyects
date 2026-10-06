@@ -130,12 +130,31 @@ guarda un backup automáticamente.
 
 ## Compartir el código
 
-El proyecto es MIT (`LICENSE`). Súbelo a GitHub cuando tengas cuenta:
+Código abierto con licencia MIT (`LICENSE`) en
+<https://github.com/efedproductions/fproyects>. Solo hay código: nada de datos,
+contraseñas ni historiales.
+
+Para publicar un cambio:
 
 ```bash
-git init && git add . && git commit -m "Diario de acciones: primera versión"
-gh repo create fproyects --public --source=. --push
+git add -A
+git status          # revisa que no se cuela nada privado
+git commit -m "Descripción del cambio"
+git push
 ```
+
+## Privacidad
+
+- **Cada instalación es su propio servidor**: los datos solo viven en el ordenador o el
+  contenedor donde corre la app. Si otra persona instala el diario, su historial queda en
+  su máquina; no pasa por la tuya ni por ningún servicio tercero.
+- El repositorio contiene **solo código**: no hay datos, contraseñas, historiales ni
+  nada extraído de una instancia real.
+- **Sin telemetría, sin analíticas, sin peticiones a internet**. Las únicas llamadas son
+  del navegador a su propia dirección, y de Let's Encrypt si usas el proxy HTTPS.
+- **Se comparte el código, no la URL**: quien lo use debe montarse su propia instancia
+  con `install.sh` o `docker compose`. No dejes la puerta abierta con una contraseña
+  compartida.
 
 ## Para desarrollar
 
